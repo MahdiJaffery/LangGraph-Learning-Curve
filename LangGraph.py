@@ -31,25 +31,12 @@ from langgraph.prebuilt import ToolNode
 
 llm = ChatOpenAI(model = openai_model, openai_api_key = openai_api_key)
 
-def callModel(state: MessagesState):
-    messages = state['messages']
-    response = llm.invoke(messages)
-    return {'messages': [response]}
-
-graph = StateGraph(MessagesState)
-graph.add_node("chatbot", callModel)
-graph.add_edge(START, "chatbot")
-graph.add_edge("chatbot", END)
-app = graph.compile()
-
 @tool
 def search(query: str):
     """blablabla"""
     if 'lhe' in query.lower() or 'lahore' in query.lower():
         return "LAHORE MENTIONED RAAAAHHHHHHH🗣️🗣️🗣️🗣️🗣️🗣️"
     return "Sai kehta hai Shehzaday. Khush reh"
-
-search.invoke("I am from Lahore")
 
 tools = [search]
 
@@ -62,10 +49,31 @@ def callModel(state: MessagesState):
     response = llmWithTool.invoke(messages)
     return {'messages': [response]}
 
-response = callModel({'messages': ['Hi, there! How are you? I am from Lahore']})
+def routerFunction(state: MessagesState) -> Literal["tools", END]:
+    messages = state["messages"]
+    lastMessage = messages[-1]
 
-print(response)
+    if lastMessage.tool_calls:
+        return "tools"
+    return END
 
-messages = response['messages']
-lastMessage = messages[-1]
-print(lastMessage.tool_calls)
+graph = StateGraph(MessagesState)
+
+graph.add_node("agent", callModel)
+graph.add_node("tools", tool_node)
+
+graph.add_edge(START, "agent")
+graph.add_conditional_edges("agent", routerFunction, {"tools": "tools", END: END})
+graph.add_edge("tools", "agent")
+
+app = graph.compile()
+
+app.invoke({'messages': "Hi, there! How are you today?"})
+
+for output in app.stream({'messages': "Lahore?"}):
+    for key, value in output.items():
+        print("*"*10)
+        print(f"Value at {key}: {value['messages'][0].content}")
+        print("\n")
+
+    
