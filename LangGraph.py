@@ -29,3 +29,19 @@ from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import ToolNode
 
+llm = ChatOpenAI(model = openai_model, openai_api_key = openai_api_key)
+
+def callModel(state: MessagesState):
+    messages = state['messages']
+    response = llm.invoke(messages)
+    return {'messages': [response]}
+
+graph = StateGraph(MessagesState)
+graph.add_node("chatbot", callModel)
+graph.add_edge(START, "chatbot")
+graph.add_edge("chatbot", END)
+app = graph.compile()
+
+response = app.invoke({'messages': 'Hi, there! My name is User'})
+
+print(response['messages'][1].content)
