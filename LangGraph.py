@@ -42,6 +42,11 @@ graph.add_edge(START, "chatbot")
 graph.add_edge("chatbot", END)
 app = graph.compile()
 
-response = app.invoke({'messages': 'Hi, there! My name is User'})
+@tool
+def search(query: str):
+    """blablabla"""
+    if 'lhe' in query.lower() or 'lahore' in query.lower():
+        return "LAHORE MENTIONED RAAAAHHHHHHH🗣️🗣️🗣️🗣️🗣️🗣️"
+    return "Sai kehta hai Shehzaday. Khush reh"
 
-print(response['messages'][1].content)
+search.invoke("I am from Lahore")
