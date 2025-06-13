@@ -65,3 +65,7 @@ def callModel(state: MessagesState):
 response = callModel({'messages': ['Hi, there! How are you? I am from Lahore']})
 
 print(response)
+
+messages = response['messages']
+lastMessage = messages[-1]
+print(lastMessage.tool_calls)
