@@ -76,4 +76,27 @@ for output in app.stream({'messages': "Lahore?"}):
         print(f"Value at {key}: {value['messages'][0].content}")
         print("\n")
 
-    
+memory = MemorySaver()
+
+graph2 = StateGraph(MessagesState)
+
+graph2.add_node("agent", callModel)
+graph2.add_node("tools", tool_node)
+
+graph2.add_edge(START, "agent")
+graph2.add_conditional_edges("agent", routerFunction, {"tools": "tools", END: END})
+graph2.add_edge("tools", "agent")
+
+app2 = graph2.compile(checkpointer=memory)
+
+config = {'configurable': {'thread_id': '1'}}
+
+events = app2.stream({'messages': ['Hi, there! My name is User. Could you tell me the weather in Lahore for today?']}, config, stream_mode = "values")
+
+for event in events:
+    event['messages'][-1].pretty_print()
+
+events = app2.stream({'messages': ['What is my name again?']}, config, stream_mode="values")
+
+for event in events:
+    event['messages'][-1].pretty_print()
