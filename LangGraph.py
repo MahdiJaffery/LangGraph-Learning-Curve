@@ -50,3 +50,18 @@ def search(query: str):
     return "Sai kehta hai Shehzaday. Khush reh"
 
 search.invoke("I am from Lahore")
+
+tools = [search]
+
+tool_node = ToolNode(tools)
+
+llmWithTool = llm.bind_tools(tools)
+
+def callModel(state: MessagesState):
+    messages = state['messages']
+    response = llmWithTool.invoke(messages)
+    return {'messages': [response]}
+
+response = callModel({'messages': ['Hi, there! How are you? I am from Lahore']})
+
+print(response)
