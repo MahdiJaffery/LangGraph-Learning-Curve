@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv, find_dotenv
 
 try:
+    useModel = str(input("Enter AI: ")).upper()
     envPath = find_dotenv()
 
     if not envPath:
@@ -9,8 +10,8 @@ try:
     if not load_dotenv(envPath):
         raise EnvironmentError("FAILED TO LOAD .env")
     
-    openai_api_key = os.environ.get("OPENAI_API_KEY")
-    openai_model = os.environ.get("OPENAI_MODEL")
+    openai_api_key = os.environ.get(f"{useModel}_API_KEY")
+    openai_model = os.environ.get(f"{useModel}_MODEL")
 
     if not openai_api_key:
         raise ValueError("API NOT FOUND")
@@ -21,6 +22,7 @@ except Exception as e:
     openai_api_key, openai_model = None, None
 
 from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.graph.message import add_messages
 from typing import Annotated, Literal, TypedDict
@@ -31,8 +33,11 @@ from langgraph.prebuilt import ToolNode
 from langchain_core.runnables import RunnableLambda
 import operator
 
-llm = ChatOpenAI(model = openai_model, openai_api_key = openai_api_key)
-
+# llm = ChatOpenAI(model = openai_model, openai_api_key = openai_api_key)
+llm = ChatGroq(
+    model="llama3-8b-8192",
+    api_key=openai_api_key
+)
 class MyState(TypedDict):
     messages: Annotated[list, operator.add]
     revision_count: int
@@ -49,7 +54,8 @@ tools = [search]
 
 tool_node = ToolNode(tools)
 
-llmWithTool = llm.bind_tools(tools)
+llmWithTool = llm
+# .bind_tools(tools)
 
 def callModel(state: MyState):
     messages = state['messages']
@@ -103,7 +109,8 @@ def dynamic_reflection_node(state: MyState) -> dict:
     
     "{last_message.content}"
 
-    Was this response helpful and complete? Reply with "accept" or "revise".
+    Was this response helpful and complete? Reply with "accept" or "revise" only nothing else needed.
+    NOTE: ONLY "accept" OR "revise".
     """
 
     decision_msg = llm.invoke([HumanMessage(content=reflectionPrompt)])
