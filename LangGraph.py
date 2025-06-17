@@ -28,6 +28,7 @@ from langchain.tools import tool
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import ToolNode
+from langchain_core.runnables import RunnableLambda
 
 llm = ChatOpenAI(model = openai_model, openai_api_key = openai_api_key)
 
@@ -57,6 +58,31 @@ def routerFunction(state: MessagesState) -> Literal["tools", END]:
         return "tools"
     return END
 
+def post_reflection_router(state) -> Literal["agent", "tools", END]:
+    decision = state.get("reflection_decision", "accept")
+
+    if decision == 'revise':
+        return 'agent'
+    
+    lastMessage = state['messages'][-1]
+    if lastMessage.tool_calls:
+        return 'tools'
+    
+    return END
+
+def reflectionNode(state: MessagesState) -> dict:
+    messages = state["messages"]
+    last_message = messages[-1]
+
+    if len(last_message.content.split()) < 5 or "I don't know" in last_message.content:
+        print("Triggering Self-Reflection")
+        return {'messages': messages, 'reflection_decision': "revise"}
+    
+    return {'messages': messages, 'reflection_decision': 'accept'}
+
+reflection = RunnableLambda(reflectionNode)
+
+
 graph = StateGraph(MessagesState)
 
 graph.add_node("agent", callModel)
@@ -78,25 +104,59 @@ for output in app.stream({'messages': "Lahore?"}):
 
 memory = MemorySaver()
 
+# graph2 = StateGraph(MessagesState)
+
+# graph2.add_node("agent", callModel)
+# graph2.add_node("tools", tool_node)
+
+# graph2.add_edge(START, "agent")
+# graph2.add_conditional_edges("agent", routerFunction, {"tools": "tools", END: END})
+# graph2.add_edge("tools", "agent")
+
+# app2 = graph2.compile(checkpointer=memory)
+
 graph2 = StateGraph(MessagesState)
 
 graph2.add_node("agent", callModel)
 graph2.add_node("tools", tool_node)
+graph2.add_node('reflection', reflection)
 
-graph2.add_edge(START, "agent")
-graph2.add_conditional_edges("agent", routerFunction, {"tools": "tools", END: END})
+graph2.set_entry_point("agent")
+
+graph2.add_edge("agent", "reflection")
+
+graph2.add_conditional_edges('reflection', post_reflection_router, {
+    'agent':    'agent',
+    'tools':    'tools',
+    END: END
+})
+
 graph2.add_edge("tools", "agent")
 
 app2 = graph2.compile(checkpointer=memory)
 
 config = {'configurable': {'thread_id': '1'}}
 
-events = app2.stream({'messages': ['Hi, there! My name is User. Could you tell me the weather in Lahore for today?']}, config, stream_mode = "values")
+# events = app2.stream({'messages': ['Hi, there! My name is User. Could you tell me the weather in Lahore for today?']}, config, stream_mode = "values")
 
-for event in events:
-    event['messages'][-1].pretty_print()
+# for event in events:
+#     event['messages'][-1].pretty_print()
 
-events = app2.stream({'messages': ['What is my name again?']}, config, stream_mode="values")
+# events = app2.stream({'messages': ['What is my name again?']}, config, stream_mode="values")
 
-for event in events:
-    event['messages'][-1].pretty_print()
+# for event in events:
+#     event['messages'][-1].pretty_print()
+
+
+while True:
+
+    inp = str(input("Prompt: "))
+
+    if inp.lower() == 'q' or inp.lower() == 'quit':
+        print("Exiting Chat...")
+        break
+
+    events = app2.stream({'messages': [f'{inp}']}, config, stream_mode="values")
+
+    for event in events:
+        event['messages'][-1].pretty_print()
